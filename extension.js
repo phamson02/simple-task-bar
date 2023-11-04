@@ -5,74 +5,31 @@
 	License GPL v3
 */
 
-const Lang = imports.lang;
-const St = imports.gi.St;
-const Main = imports.ui.main;
-const Util = imports.misc.util;
-const Meta = imports.gi.Meta;
-const Shell = imports.gi.Shell;
-const Clutter = imports.gi.Clutter;
-const AppMenu = Main.panel.statusArea.appMenu;
-const PopupMenu = imports.ui.popupMenu;
-const GLib = imports.gi.GLib;
-const Gio = imports.gi.Gio;
-const Me = imports.misc.extensionUtils.getCurrentExtension();
+import St from 'gi://St';
+import Meta from 'gi://Meta';
+import Shell from 'gi://Shell';
+import Clutter from 'gi://Clutter';
+import GLib from 'gi://GLib';
+import Gio from 'gi://Gio';
 
-// translation needed to restore Places Menu label when disable extension
-const Gettext = imports.gettext.domain('gnome-shell-extensions');
-const _ = Gettext.gettext;
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as Util from 'resource:///org/gnome/shell/misc/util.js';
+import * as AppMenu from 'resource:///org/gnome/shell/ui/appMenu.js';
+import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
+
+import {Extension, gettext as _} from 'resource:///org/gnome/shell/extensions/extension.js';
 const N_ = x => x;
 
 
-const WindowList = new Lang.Class({
-	Name: 'WindowList.WindowList',
-	
+export default class WindowList extends Extension {
+
 	// create the task bar container and signals
-	_init: function(){
-		// get settings
-		let gschema = Gio.SettingsSchemaSource.new_from_directory(
-			Me.dir.get_child('schemas').get_path(),
-			Gio.SettingsSchemaSource.get_default(),
-			false
-		);
-		this.settings_schema = gschema.lookup('org.gnome.shell.extensions.simple-task-bar', true);
-		this.settings = new Gio.Settings({
-			settings_schema: this.settings_schema
-		});
-
-		// signals for settings change
-		let keys = this.settings_schema.list_keys();
-		this.signals_array = [];
-		for (let i in keys) {
-			let key = keys[i];
-			if (key == "remove-activities") {
-				this.signals_array[i] = this.settings.connect( "changed::" + key, this._set_Activities_visibility.bind(this) );
-			} else if (key == "places-menu-icon") {
-				this.signals_array[i] = this.settings.connect( "changed::" + key, this._set_Places_to_icon.bind(this) );
-			} else {
-				this.signals_array[i] = this.settings.connect( "changed::" + key, this._updateMenu.bind(this) );
-			}
-		}
-
-		if (this.settings.get_boolean("remove-activities")) {
-			this._set_Activities_visibility();
-		};
-
-		if (this.settings.get_boolean("places-menu-icon")) {
-			this._set_Places_to_icon();
-		};
-	
-		this.apps_menu = new St.BoxLayout({});
-		this.actor = this.apps_menu;
-        this._updateMenu();
-		this._restacked = global.display.connect('restacked', Lang.bind(this, this._updateMenu));
-		this._window_change_monitor = global.display.connect('window-left-monitor', Lang.bind(this, this._updateMenu));
-		this._workspace_changed = global.workspace_manager.connect('active-workspace-changed', Lang.bind(this, this._updateMenu));
-		this._workspace_number_changed = global.workspace_manager.connect('notify::n-workspaces', Lang.bind(this, this._updateMenu));
-	},
+	constructor(metadata){
+		super(metadata);
+	}
 
 	// destroy the task bar
-	_destroy: function() {
+	_destroy() {
 		if (this.settings.get_boolean("remove-activities")) {
 			this._set_Activities_visibility(true);
 		};
@@ -92,10 +49,10 @@ const WindowList = new Lang.Class({
 		
 		// destroy task bar container
 		this.apps_menu.destroy();
-	},
+	}
 	
 	// hide Activities button
-	_set_Activities_visibility: function(extension_disabled) {
+	_set_Activities_visibility(extension_disabled) {
 		if ( (extension_disabled == true && this.settings.get_boolean("remove-activities")) || !this.settings.get_boolean("remove-activities") ) {
 			let activities_indicator = Main.panel.statusArea['activities'];
 			if (activities_indicator && !Main.sessionMode.isLocked) {
@@ -107,10 +64,10 @@ const WindowList = new Lang.Class({
 				activities_indicator.container.hide();
 			}
 		}
-	},
+	}
 
 	// change Places label to folder icon or restore label
-	_set_Places_to_icon: function(extension_disabled) {
+	_set_Places_to_icon(extension_disabled) {
 		let places_menu_indicator = Main.panel.statusArea['places-menu'];
 		if (places_menu_indicator) {
 			places_menu_indicator.remove_child(places_menu_indicator.get_first_child());
@@ -132,15 +89,15 @@ const WindowList = new Lang.Class({
 				places_menu_indicator.add_actor(places_menu_box);
 			}
 		}
-	},
+	}
 
 	// update the task bar
-    _updateMenu: function() {   
+    _updateMenu() {   
     	// destroy old task bar 	
     	this.apps_menu.destroy_all_children();
     	
-		// update the focused window title
-    	this._updateTitle();
+		// NOT WORKING: update the focused window title
+    	// this._updateTitle();
     	
     	// track windows and get the number of workspaces
         this.tracker = Shell.WindowTracker.get_default();
@@ -185,8 +142,9 @@ const WindowList = new Lang.Class({
 	           		box.window.connect("notify::title", this._updateTitle.bind(this));
 	            	box.tooltip = box.window.get_title();
 	            	box.app = this.tracker.get_window_app(box.window);
-		            box.connect('button-press-event', Lang.bind(this, function() {
-		            							this._activateWindow(metaWorkspace, metaWindow); } ));
+					box.connect('button-press-event', () => {
+						this._activateWindow(metaWorkspace, metaWindow);
+					});
 		            box.icon = box.app.create_icon_texture(this.settings.get_int("icon-size"));
 		            if (this.settings.get_boolean("desaturated-icons")) {
 						let iconEffect = new Clutter.DesaturateEffect();
@@ -200,8 +158,8 @@ const WindowList = new Lang.Class({
 		            	 else {box.style_class = 'unfocused-app';}
 		            };
 		           	box.set_child(box.icon);
-		           	box.connect('notify::hover', Lang.bind(this, function() {
-		            							this._onHover(box, box.tooltip); } ));
+		           	box.connect('notify::hover', () => {
+		            							this._onHover(box, box.tooltip); } );
 		            this.apps_menu.add_actor(box);
             	}
             };
@@ -232,8 +190,8 @@ const WindowList = new Lang.Class({
 					this.ws_box.label.set_text((" " + (workspace_index+1) + " ").toString());
 				};
 				this.ws_box.set_child(this.ws_box.label);
-				this.ws_box.connect('button-press-event', Lang.bind(this, function() {
-		        							this._activateWorkspace(metaWorkspace); } ));
+				this.ws_box.connect('button-press-event', () => {
+		        							this._activateWorkspace(metaWorkspace); } );
 		        this.apps_menu.add_actor(this.ws_box);
 		    	
 		    	this.windows = this.windows.filter(
@@ -252,8 +210,8 @@ const WindowList = new Lang.Class({
 	            box.window.connect("notify::title", this._updateTitle.bind(this));
 	            box.tooltip = box.window.get_title();
 	            box.app = this.tracker.get_window_app(box.window);
-                box.connect('button-press-event', Lang.bind(this, function() {
-                							this._activateWindow(metaWorkspace, metaWindow); } ));
+                box.connect('button-press-event', () => {
+                							this._activateWindow(metaWorkspace, metaWindow); } );
 				box.icon = box.app.create_icon_texture(this.settings.get_int("icon-size"));
 				if (this.settings.get_boolean("desaturated-icons")) {
 					let iconEffect = new Clutter.DesaturateEffect();
@@ -267,20 +225,20 @@ const WindowList = new Lang.Class({
                 	 else {box.style_class = 'unfocused-app';}
                 };
                	box.set_child(box.icon);
-               	box.connect('notify::hover', Lang.bind(this, function() {
-                							this._onHover(box, box.tooltip); } ));
+               	box.connect('notify::hover', () => {
+                							this._onHover(box, box.tooltip); } );
                 this.apps_menu.add_actor(box);
             };
         };
-    },
+    }
 
 	// windows list sort function by window id
-    _sortWindows: function(w1, w2) {
+    _sortWindows(w1, w2) {
     	return w1.get_id() - w2.get_id();
-    },
+    }
     
-	// displays the focused window title
-    _updateTitle: function() {
+	// NOT WORKING: displays the focused window title
+    _updateTitle() {
     	if (global.display.get_focus_window()) {
 			if (this.settings.get_boolean("show-window-titles")) {
 				this.window_label = global.display.get_focus_window().get_title();
@@ -294,19 +252,19 @@ const WindowList = new Lang.Class({
 				AppMenu._label.set_text(this.window_label);
 			}
     	};
-    },
+    }
     
-    // hover on app icon button b shows its window title tt
-    _onHover: function(b, tt) {
+    // NOT WORKING: hover on app icon button b shows its window title tt
+    _onHover(b, tt) {
     	if (tt && b.hover) {
     		AppMenu._label.set_text(tt);
     	} else {
     		this._updateTitle();
     	};
-    },
+    }
     
     // activate workspace ws
-    _activateWorkspace: function(ws) {
+    _activateWorkspace(ws) {
 		if (global.workspace_manager.get_active_workspace() === ws) {
 			Main.overview.toggle();
 		}
@@ -314,10 +272,10 @@ const WindowList = new Lang.Class({
 			Main.overview.show();
 		};
 		ws.activate(global.get_current_time());
-    },
+    }
 
 	// switch to workspace ws and activate window w
-    _activateWindow: function(ws, w) {
+    _activateWindow(ws, w) {
         if (global.workspace_manager.get_active_workspace() === ws && w.has_focus() 
         												&& !(Main.overview.visible)) {
        		w.minimize();
@@ -331,30 +289,63 @@ const WindowList = new Lang.Class({
 		if (!(w.is_on_all_workspaces())) { ws.activate(global.get_current_time()); };
     }
 
-});
+	enable() {
+		let gschema = Gio.SettingsSchemaSource.new_from_directory(
+			this.dir.get_child('schemas').get_path(),
+			Gio.SettingsSchemaSource.get_default(),
+			false
+		);
+		this.settings_schema = gschema.lookup('org.gnome.shell.extensions.simple-task-bar', true);
+		this.settings = new Gio.Settings({
+			settings_schema: this.settings_schema
+		});
 
-let windowlist;
+		// signals for settings change
+		let keys = this.settings_schema.list_keys();
+		this.signals_array = [];
+		for (let i in keys) {
+			let key = keys[i];
+			if (key == "remove-activities") {
+				this.signals_array[i] = this.settings.connect( "changed::" + key, this._set_Activities_visibility.bind(this) );
+			} else if (key == "places-menu-icon") {
+				this.signals_array[i] = this.settings.connect( "changed::" + key, this._set_Places_to_icon.bind(this) );
+			} else {
+				this.signals_array[i] = this.settings.connect( "changed::" + key, this._updateMenu.bind(this) );
+			}
+		}
 
-function init() {
-}
+		if (this.settings.get_boolean("remove-activities")) {
+			this._set_Activities_visibility();
+		};
 
-function enable() {
-    // activate and display task bar in the panel
-	windowlist = new WindowList;
-    let position = 1;
-    if ('places-menu' in Main.panel.statusArea)
-        position++;
-    Main.panel._leftBox.insert_child_at_index(windowlist.actor, position);
+		if (this.settings.get_boolean("places-menu-icon")) {
+			this._set_Places_to_icon();
+		};
+	
+		this.apps_menu = new St.BoxLayout({});
+		this.actor = this.apps_menu;
+        this._updateMenu();
+		this._restacked = global.display.connect('restacked', () => this._updateMenu());
+		this._window_change_monitor = global.display.connect('window-left-monitor', () => this._updateMenu());
+		this._workspace_changed = global.workspace_manager.connect('active-workspace-changed', () => this._updateMenu());
+		this._workspace_number_changed = global.workspace_manager.connect('notify::n-workspaces', () => this._updateMenu());
 
-	// hide icon before the AppMenu label
-	AppMenu._iconBox.hide();
+		let position = 1;
+		if ('places-menu' in Main.panel.statusArea)
+			position++;
+		Main.panel._leftBox.insert_child_at_index(this.actor, position);
 
-}
+		// hide icon before the AppMenu label
+		// AppMenu._iconBox.hide();
+	}
 
-function disable() {
-	// destroy task bar
-	windowlist._destroy();
+	disable() {
 
-	// restore default AppMenu label
-	AppMenu._iconBox.show();
-}
+		// restore default AppMenu label
+		// AppMenu._iconBox.show();
+		
+		this._destroy();
+		
+	}
+
+};

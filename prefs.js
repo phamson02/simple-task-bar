@@ -1,58 +1,43 @@
-const GObject = imports.gi.GObject;
-const Gtk = imports.gi.Gtk;
-const Gio = imports.gi.Gio;
-const Me = imports.misc.extensionUtils.getCurrentExtension();
+import GObject from 'gi://GObject';
+import Gtk from 'gi://Gtk';
+import Gio from 'gi://Gio';
+import Adw from 'gi://Adw';
 
-function init () {
-}
+import { ExtensionPreferences, gettext as _ } from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
-function buildPrefsWidget () {
-  let widget = new MyPrefsWidget();
-  widget.show_all();
-  return widget;
-}
+export default class MyPrefsWidget extends ExtensionPreferences {
+    _init() {
+        super._init();
 
-const MyPrefsWidget = new GObject.Class({
-
-    Name : "My.Prefs.Widget",
-    GTypeName : "MyPrefsWidget",
-    Extends : Gtk.Box, // or ScrolledWindow if this gets too big
-  
-    _init : function (params) {
-        // get settings
-        let gschema = Gio.SettingsSchemaSource.new_from_directory(
-            Me.dir.get_child('schemas').get_path(),
-            Gio.SettingsSchemaSource.get_default(),
-            false
-        );
-        this._settings_schema = gschema.lookup('org.gnome.shell.extensions.simple-task-bar', true);
-        this.settings = new Gio.Settings({
-            settings_schema: this._settings_schema
-        });
-    
-        this.parent(params);
+        // Load the UI from the glade file
+        this._builder = new Gtk.Builder();
+        this._builder.add_from_file(`${this.extension.dir.get_path()}/prefs.ui`);
         
-        let builder = new Gtk.Builder();
-        builder.add_from_file(Me.path + '/prefs.ui');   
-    
-        this.add( builder.get_object('main_prefs') );
+        // The main container from the builder
+        this.main_widget = this._builder.get_object('main_prefs');
+        this.append(this.main_widget);
 
-        // bind settings to the UI objects
-        let keys = this._settings_schema.list_keys(); // list_keys() is in a "random" order
-        for (let i in keys) {
-            let key = keys[i]
-            // bind setting to property of GUI object (spinboxes, switches, etc...)
-            this.settings.bind(
-                key,
-                builder.get_object(key), // make sure the objects in prefs.ui have the same name as the keys in the settings (schema.xml)
-                this._get_bind_property(key),
-                Gio.SettingsBindFlags.DEFAULT
-            );
-        }
-    },
+        // Initialize the settings schema
+        this._initSettings();
+    }
 
-    // manually add the keys to the arrays in this function
-    _get_bind_property : function (key) {
+    // Initialize settings
+    _initSettings() {
+        this._settings = this.getSettings('org.gnome.shell.extensions.simple-task-bar');
+
+        // Bind the settings to the UI elements
+        const schemaKeys = this._settings.list_keys();
+        schemaKeys.forEach(key => {
+            const widget = this._builder.get_object(key);
+            if (widget) {
+                const bindProperty = this._getBindProperty(key);
+                this._settings.bind(key, widget, bindProperty, Gio.SettingsBindFlags.DEFAULT);
+            }
+        });
+    }
+
+    // Determine the property to bind based on the setting type
+    _getBindProperty(key) {
         let ints = ['hidden-opacity', 'icon-size', 'padding-between-workspaces'];
         let strings = ['sticky-workspace-label', 'custom-workspace-labels'];
         // let bools = ['places-menu-icon', 'remove-activities', 'display-sticky-workspace', 'display-custom-workspaces', 'display-last-workspace', 'display-workspaces', 'desaturated-icons', 'show-window-titles'];
@@ -64,8 +49,5 @@ const MyPrefsWidget = new GObject.Class({
         } else {
             return "active"; // SHOULD mean bools.includes(key) == true, so switch.active
         }
-
     }
-
-});
-
+}
