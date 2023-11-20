@@ -14,7 +14,7 @@ import Gio from 'gi://Gio';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as Util from 'resource:///org/gnome/shell/misc/util.js';
-import * as AppMenu from 'resource:///org/gnome/shell/ui/appMenu.js';
+// import * as AppMenu from 'resource:///org/gnome/shell/ui/appMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 import {Extension, gettext as _} from 'resource:///org/gnome/shell/extensions/extension.js';
@@ -248,9 +248,9 @@ export default class WindowList extends Extension {
 					this.window_label = this.tracker.get_window_app(global.display.get_focus_window()).get_name();
 				}
 			}
-			if (this.window_label) {
-				AppMenu._label.set_text(this.window_label);
-			}
+			// if (this.window_label) {
+			// 	AppMenu._label.set_text(this.window_label);
+			// }
     	};
     }
     
