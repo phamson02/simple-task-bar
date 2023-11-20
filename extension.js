@@ -97,7 +97,7 @@ export default class WindowList extends Extension {
     	this.apps_menu.destroy_all_children();
     	
 		// NOT WORKING: update the focused window title
-    	// this._updateTitle();
+    	this._updateTitle();
     	
     	// track windows and get the number of workspaces
         this.tracker = Shell.WindowTracker.get_default();
@@ -256,11 +256,11 @@ export default class WindowList extends Extension {
     
     // NOT WORKING: hover on app icon button b shows its window title tt
     _onHover(b, tt) {
-    	if (tt && b.hover) {
-    		AppMenu._label.set_text(tt);
-    	} else {
-    		this._updateTitle();
-    	};
+    	// if (tt && b.hover) {
+    	// 	AppMenu._label.set_text(tt);
+    	// } else {
+    	// 	this._updateTitle();
+    	// };
     }
     
     // activate workspace ws
